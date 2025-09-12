@@ -8,6 +8,71 @@ import subprocess
 from urllib.error import URLError
 from urllib.error import HTTPError
 import traceback
+import sys
+
+def load_module_compat(module_name, file_path):
+    """Load a Python module with maximum compatibility across Python versions"""
+    import warnings
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            import imp
+        return imp.load_source(module_name, file_path)
+    except ImportError:
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+        except (ImportError, AttributeError):
+            import importlib
+            with open(file_path, 'r') as f:
+                code = compile(f.read(), file_path, 'exec')
+                module = type(sys)(module_name)
+                exec(code, module.__dict__)
+                return module
+
+# Python 3.4 compatible subprocess.run replacement
+def subprocess_run_compat(*args, **kwargs):
+    """Python 3.4 compatible version of subprocess.run"""
+    if hasattr(subprocess, 'run'):
+        return subprocess.run(*args, **kwargs)
+    
+    # Fallback for Python 3.4
+    capture_output = kwargs.pop('capture_output', False)
+    text = kwargs.pop('text', False)
+    timeout = kwargs.pop('timeout', None)
+    
+    if capture_output:
+        kwargs['stdout'] = subprocess.PIPE
+        kwargs['stderr'] = subprocess.PIPE
+    
+    try:
+        proc = subprocess.Popen(*args, **kwargs)
+        stdout, stderr = proc.communicate(timeout=timeout)
+        
+        if text and stdout:
+            stdout = stdout.decode('utf-8')
+        if text and stderr:
+            stderr = stderr.decode('utf-8')
+            
+        # Create a result object similar to subprocess.CompletedProcess
+        class CompletedProcess:
+            def __init__(self, args, returncode, stdout=None, stderr=None):
+                self.args = args
+                self.returncode = returncode
+                self.stdout = stdout
+                self.stderr = stderr
+        
+        return CompletedProcess(args, proc.returncode, stdout, stderr)
+    except Exception:  # Python 3.4 doesn't have TimeoutExpired
+        try:
+            proc.kill()
+            proc.wait()
+        except:
+            pass
+        raise
 import configparser
 import base64
 
@@ -37,7 +102,7 @@ def print_debug(text, *args):
         return
     with open(_vimai_thread_log_file_path, "a") as file:
         message = text.format(*args) if len(args) else text
-        file.write(f"[{datetime.datetime.now()}] " + message + "\n")
+        file.write("[" + str(datetime.datetime.now()) + "] " + message + "\n")
 
 class KnownError(Exception):
     pass
@@ -147,26 +212,44 @@ def parse_include_paths(path):
 
     expanded_paths = [path]
     if '*' in path:
-        expanded_paths = sorted(glob.glob(path, recursive=True))
+        # Python 3.4 compatible glob - use glob2 pattern for recursive
+        if '**' in path:
+            import fnmatch
+            # Manual recursive glob for Python 3.4
+            expanded_paths = []
+            base_dir = path.split('**')[0].rstrip('/') or '.'
+            pattern = path.split('**')[1].lstrip('/')
+            if os.path.exists(base_dir):
+                for root, dirs, files in os.walk(base_dir):
+                    for file in files:
+                        full_path = os.path.join(root, file)
+                        # Convert to relative path if original was relative
+                        if not os.path.isabs(path):
+                            full_path = os.path.relpath(full_path)
+                        if fnmatch.fnmatch(file, pattern):
+                            expanded_paths.append(full_path)
+            expanded_paths = sorted(expanded_paths)
+        else:
+            expanded_paths = sorted(glob.glob(path))
 
     return [path for path in expanded_paths if not os.path.isdir(path)]
 
 def make_image_message(path):
     ext = path.split('.')[-1]
     base64_image = encode_image(path)
-    return { 'type': 'image_url', 'image_url': { 'url': f"data:image/{ext.replace('.', '')};base64,{base64_image}" } }
+    return { 'type': 'image_url', 'image_url': { 'url': 'data:image/{};base64,{}'.format(ext.replace('.', ''), base64_image) } }
 
 def make_text_file_message(path):
     try:
         with open(path, 'r') as file:
             file_content = file.read().strip()
-            return { 'type': 'text', 'text': f'==> {path} <==\n' + file_content.strip() }
+            return { 'type': 'text', 'text': '==> {} <==\n'.format(path) + file_content.strip() }
     except UnicodeDecodeError:
-        return { 'type': 'text', 'text': f'==> {path} <==\nBinary file, cannot display' }
+        return { 'type': 'text', 'text': '==> {} <==\nBinary file, cannot display'.format(path) }
 
 def make_exec_output_message(cmd, timeout=5):
-    ps = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, timeout=timeout)
-    return { 'type': 'text', 'text': f'==> {cmd} <==\n{ps.stdout}' }
+    ps = subprocess_run_compat(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, timeout=timeout)
+    return { 'type': 'text', 'text': '==> {} <==\n{}'.format(cmd, ps.stdout) }
 
 def parse_chat_messages(chat_content):
     lines = chat_content.splitlines()
@@ -276,7 +359,7 @@ def print_info_message(msg):
     escaped_msg = msg.replace("'", "`")
     vim.command("redraw")
     vim.command("echohl ErrorMsg")
-    vim.command(f"echomsg '{escaped_msg}'")
+    vim.command("echomsg '{}'".format(escaped_msg))
     vim.command("echohl None")
 
 def parse_error_message(error):
@@ -294,14 +377,14 @@ def handle_completion_error(provider, error):
     elif isinstance(error, HTTPError):
         status_code = error.getcode()
         error_message = parse_error_message(error)
-        msg = f"{provider}: HTTPError {status_code}"
+        msg = "{}: HTTPError {}".format(provider, status_code)
         if error_message:
-            msg += f": {error_message}"
+            msg += ": {}".format(error_message)
         print_info_message(msg)
     elif isinstance(error, URLError) and isinstance(error.reason, socket.timeout):
         print_info_message("Request timeout...")
     elif isinstance(error, URLError):
-        print_info_message(f"URLError: {error.reason}")
+        print_info_message("URLError: {}".format(error.reason))
     elif isinstance(error, KnownError):
         print_info_message(str(error))
     else:
@@ -316,7 +399,7 @@ def enhance_roles_with_custom_function(roles):
     if vim.eval("exists('g:vim_ai_roles_config_function')") == '1':
         roles_config_function = vim.eval("g:vim_ai_roles_config_function")
         if not vim.eval("exists('*" + roles_config_function + "')"):
-            raise Exception(f"Role config function does not exist: {roles_config_function}")
+            raise Exception("Role config function does not exist: {}".format(roles_config_function))
         else:
             roles.update(vim.eval(roles_config_function + "()"))
 
@@ -325,7 +408,7 @@ def read_role_files():
     default_roles_config_path = str(os.path.join(plugin_root, "roles-default.ini"))
     roles_config_path = os.path.expanduser(vim.eval("g:vim_ai_roles_config_file"))
     if not os.path.exists(roles_config_path):
-        raise Exception(f"Role config file does not exist: {roles_config_path}")
+        raise Exception("Role config file does not exist: {}".format(roles_config_path))
 
     roles = configparser.ConfigParser()
     roles.read([default_roles_config_path, roles_config_path])
@@ -338,11 +421,20 @@ def save_b64_to_file(path, b64_data):
 
 def load_provider(provider_name):
     try:
+        # Ensure Python path is set for provider loading
+        plugin_root = vim.eval("s:plugin_root")
+        vim.command("py3 import sys")
+        vim.command("py3 plugin_py_path = '{}/vim_ai'".format(plugin_root))
+        vim.command("py3 if plugin_py_path not in sys.path: sys.path.insert(0, plugin_py_path)")
+        # Also add parent directory so vim_ai can be imported as a package
+        vim.command("py3 parent_path = '{}'".format(plugin_root))
+        vim.command("py3 if parent_path not in sys.path: sys.path.insert(0, parent_path)")
+        
         providers = vim.eval("g:vim_ai_providers")
         provider_config = providers[provider_name]
         provider_path = provider_config['script_path']
         provider_class_name = provider_config['class_name']
-        vim.command(f"py3file {provider_path}")
+        vim.command("py3file {}".format(provider_path))
         provider_class = globals()[provider_class_name]
     except KeyError as error:
         print_debug("[load-provider] provider: {}", error)

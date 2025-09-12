@@ -14,9 +14,22 @@ let s:scratch_buffer_name = ">>> AI chat"
 let s:chat_redraw_interval = 250 " milliseconds
 
 function! s:ImportPythonModules()
-  for py_module in ['types', 'utils', 'context', 'chat', 'complete', 'roles', 'image']
+  " Add plugin vim_ai directory to Python path for imports
+  py3 import sys
+  py3 import os
+  execute "py3 plugin_py_path = '" . s:plugin_root . "/vim_ai'"
+  py3 plugin_py_path = os.path.abspath(plugin_py_path)
+  py3 if plugin_py_path not in sys.path: sys.path.insert(0, plugin_py_path)
+  
+  for py_module in ['ai_types', 'utils', 'context', 'chat', 'complete', 'roles', 'image']
     if !py3eval("'" . py_module . "_py_imported' in globals()")
-      execute "py3file " . s:plugin_root . "/py/" . py_module . ".py"
+      try
+        execute "py3file " . s:plugin_root . "/vim_ai/" . py_module . ".py"
+      catch
+        echohl ErrorMsg
+        echo "vim-ai: Failed to load " . py_module . ".py: " . v:exception
+        echohl None
+      endtry
     endif
   endfor
 endfunction

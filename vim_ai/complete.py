@@ -21,9 +21,9 @@ def run_ai_completition(context):
 
             initial_prompt = config_options.get('initial_prompt', [])
             initial_prompt = '\n'.join(initial_prompt)
-            chat_content = f"{initial_prompt}\n\n>>> user\n\n{prompt}".strip()
+            chat_content = "{}\n\n>>> user\n\n{}".format(initial_prompt, prompt).strip()
             messages = parse_chat_messages(chat_content)
-            print_debug(f"[{command_type}] text:\n" + chat_content)
+            print_debug("[{}] text:\n".format(command_type) + chat_content)
 
             provider_class = load_provider(config['provider'])
             provider = provider_class(command_type, config_options, ai_provider_utils)

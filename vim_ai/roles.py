@@ -2,7 +2,12 @@ import vim
 import os
 
 if "PYTEST_VERSION" in os.environ:
-    from utils import *
+    from .utils import *
+else:
+    try:
+        from utils import read_role_files, DEFAULT_ROLE_NAME, enhance_roles_with_custom_function
+    except ImportError:
+        from .utils import read_role_files, DEFAULT_ROLE_NAME, enhance_roles_with_custom_function
 
 roles_py_imported = True
 

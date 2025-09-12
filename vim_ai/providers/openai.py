@@ -1,5 +1,5 @@
 from collections.abc import Sequence, Mapping, Iterator
-from typing import Any
+from typing import Any, List
 import urllib.request
 import os
 import json
@@ -7,7 +7,7 @@ import vim
 
 if "VIMAI_DUMMY_IMPORT" in os.environ:
     # TODO: figure out how to properly use imports/modules in vim, dev environment, pytest
-    from py.types import AIMessage, AIResponseChunk, AIUtils, AIProvider, AICommandType, AIImageResponseChunk
+    from vim_ai.ai_types import AIMessage, AIResponseChunk, AIUtils, AIProvider, AICommandType, AIImageResponseChunk
 
 class OpenAIProvider():
 
@@ -19,9 +19,11 @@ class OpenAIProvider():
     def __init__(self, command_type: AICommandType, raw_options: Mapping[str, str], utils: AIUtils) -> None:
         self.utils = utils
         self.command_type = command_type
-        config_varname = getattr(self, f"default_options_varname_{command_type}")
+        config_varname = getattr(self, "default_options_varname_{}".format(command_type))
         raw_default_options = vim.eval(config_varname)
-        self.options = self._parse_raw_options({**raw_default_options, **raw_options})
+        merged_options = raw_default_options.copy()
+        merged_options.update(raw_options)
+        self.options = self._parse_raw_options(merged_options)
 
     def _protocol_type_check(self) -> None:
         # dummy method, just to ensure type safety
@@ -47,9 +49,9 @@ class OpenAIProvider():
             return messages
 
         request = {
-            'messages': _flatten_content(messages),
-            **openai_options
+            'messages': _flatten_content(messages)
         }
+        request.update(openai_options)
         self.utils.print_debug("openai: [{}] request: {}", self.command_type, request)
         url = options['endpoint_url']
         response = self._openai_request(url, request, http_options)
@@ -100,14 +102,14 @@ class OpenAIProvider():
             # raise error for users who don't use default value of this obsolete option
             raise self.utils.make_known_error("`enable_auth = 0` option is no longer supported. use `auth_type = none` instead")
 
-        options = {**raw_options}
+        options = raw_options.copy()
 
         def _convert_option(name, converter):
             if name in options and isinstance(options[name], str) and options[name] != '':
                 try:
                     options[name] = converter(options[name])
                 except (ValueError, TypeError, json.JSONDecodeError) as e:
-                    raise self.utils.make_known_error(f"Invalid value for option '{name}': {options[name]}. Error: {e}")
+                    raise self.utils.make_known_error("Invalid value for option '{}': {}. Error: {}".format(name, options[name], e))
 
         _convert_option('request_timeout', float)
 
@@ -172,7 +174,7 @@ class OpenAIProvider():
 
         return result
 
-    def request_image(self, prompt: str) -> list[AIImageResponseChunk]:
+    def request_image(self, prompt: str) -> List[AIImageResponseChunk]:
         options = self.options
         http_options = {
             'request_timeout': options['request_timeout'],
@@ -187,7 +189,8 @@ class OpenAIProvider():
             'style': options['style'],
             'response_format': 'b64_json',
         }
-        request = { 'prompt': prompt, **openai_options }
+        request = { 'prompt': prompt }
+        request.update(openai_options)
         self.utils.print_debug("openai: [{}] request: {}", self.command_type, request)
         url = options['endpoint_url']
         response, *_ = self._openai_request(url, request, http_options)
@@ -207,19 +210,19 @@ class OpenAIProvider():
 
         if auth_type == 'bearer':
             (OPENAI_API_KEY, OPENAI_ORG_ID) = self._load_api_key()
-            headers['Authorization'] = f"Bearer {OPENAI_API_KEY}"
+            headers['Authorization'] = "Bearer {}".format(OPENAI_API_KEY)
 
             if OPENAI_ORG_ID is not None:
-                headers["OpenAI-Organization"] =  f"{OPENAI_ORG_ID}"
+                headers["OpenAI-Organization"] = "{}".format(OPENAI_ORG_ID)
 
         if auth_type == 'api-key':
             (OPENAI_API_KEY, _) = self._load_api_key()
-            headers['api-key'] = f"{OPENAI_API_KEY}"
+            headers['api-key'] = "{}".format(OPENAI_API_KEY)
 
         request_timeout=options['request_timeout']
         req = urllib.request.Request(
             url,
-            data=json.dumps({ **data }).encode("utf-8"),
+            data=json.dumps(data).encode("utf-8"),
             headers=headers,
             method="POST",
         )

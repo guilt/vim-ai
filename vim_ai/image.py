@@ -12,7 +12,7 @@ def make_image_path(ui):
     except AttributeError:
         utc = datetime.timezone.utc  # Older versions
     timestamp = datetime.datetime.now(utc).strftime("%Y%m%dT%H%M%SZ")
-    filename = f'vim_ai_{timestamp}.png'
+    filename = 'vim_ai_{}.png'.format(timestamp)
     return os.path.join(download_dir, filename)
 
 def run_ai_image(context):
@@ -35,7 +35,7 @@ def run_ai_image(context):
             for image in response_chunks:
                 path = make_image_path(ui)
                 save_b64_to_file(path, image['b64_data'])
-                info_messages.append(f"Image: {path}")
+                info_messages.append("Image: {}".format(path))
 
             clear_echo_message()
             print("\n".join(info_messages))

@@ -1,4 +1,4 @@
-from context import make_ai_context, make_prompt
+from vim_ai.context import make_ai_context, make_prompt
 from unittest.mock import patch
 import vim
 
@@ -54,13 +54,13 @@ def test_default_config():
         'user_selection': 'Hello world!',
         'command_type': 'chat',
     })
-    expected_options = {
-        **default_config['options'],
-        'token_file_path': '/custom/path/ai.token',
-    }
+    expected_options = default_config['options'].copy()
+    expected_options['token_file_path'] = '/custom/path/ai.token'
+    expected_config = default_config.copy()
+    expected_config['options'] = expected_options
     expected_context = {
         'command_type': 'chat',
-        'config': { **default_config, 'options': expected_options },
+        'config': expected_config,
         'prompt': 'translate to Slovak:\nHello world!',
         'command_type': 'chat',
         'roles': [],
@@ -102,7 +102,9 @@ def test_role_config_different_commands():
         'user_instruction': '/test-role hello',
         'user_selection': '',
     }
-    context  = make_ai_context({ **base, 'command_type': 'chat' })
+    context_args = base.copy()
+    context_args['command_type'] = 'chat'
+    context  = make_ai_context(context_args)
     actual_config = context['config']
     actual_prompt = context['prompt']
     assert 'model-common' == actual_config['options']['model']
@@ -111,7 +113,9 @@ def test_role_config_different_commands():
     assert 'hello' == actual_prompt
     assert 'https://localhost/chat' == actual_config['options']['endpoint_url']
 
-    context  = make_ai_context({ **base, 'command_type': 'complete' })
+    context_args = base.copy()
+    context_args['command_type'] = 'complete'
+    context  = make_ai_context(context_args)
     actual_config = context['config']
     actual_prompt = context['prompt']
     assert 'model-common' == actual_config['options']['model']
@@ -119,7 +123,9 @@ def test_role_config_different_commands():
     assert 'hello' == actual_prompt
     assert 'https://localhost/complete' == actual_config['options']['endpoint_url']
 
-    context  = make_ai_context({ **base, 'command_type': 'edit' })
+    context_args = base.copy()
+    context_args['command_type'] = 'edit'
+    context  = make_ai_context(context_args)
     actual_config = context['config']
     actual_prompt = context['prompt']
     assert 'model-common' == actual_config['options']['model']
@@ -160,14 +166,14 @@ def test_image_role():
         'user_selection': '',
         'command_type': 'image',
     })
-    expected_options = {
-        **default_image_config['options'],
-        'token_file_path': '/custom/path/ai.token',
-        'quality': 'hd',
-    }
+    expected_options = default_image_config['options'].copy()
+    expected_options['token_file_path'] = '/custom/path/ai.token'
+    expected_options['quality'] = 'hd'
+    expected_config = default_image_config.copy()
+    expected_config['options'] = expected_options
     expected_context = {
         'command_type': 'image',
-        'config': { **default_image_config, 'options': expected_options },
+        'config': expected_config,
         'prompt': 'picture of the moon',
         'command_type': 'image',
         'roles': ['hd-image'],
@@ -182,10 +188,14 @@ def test_default_roles():
         'user_selection': '',
         'command_type': 'chat',
     }
-    context = make_ai_context({ **base, 'user_instruction': '/right hello world!' })
+    context_args = base.copy()
+    context_args['user_instruction'] = '/right hello world!'
+    context = make_ai_context(context_args)
     assert 'preset_right' == context['config']['ui']['open_chat_command']
 
-    context = make_ai_context({ **base, 'user_instruction': '/tab' })
+    context_args = base.copy()
+    context_args['user_instruction'] = '/tab'
+    context = make_ai_context(context_args)
     assert 'preset_tab' == context['config']['ui']['open_chat_command']
 
 def test_user_prompt():
@@ -206,13 +216,13 @@ def test_selection_boundary():
 
 def test_markdown_selection_boundary():
     # add file type to markdown boundary
-    with patch('vim.eval', return_value = "python") as mock_eval:
+    with patch('vim_ai.context.vim.eval', return_value = "python") as mock_eval:
         assert 'fix grammar:\n```python\nhelo word\n```' == make_prompt( '', 'fix grammar', 'helo word', '```')
 
     # do not add filetype if not appropriate
-    with patch('vim.eval', return_value = "aichat") as mock_eval:
+    with patch('vim_ai.context.vim.eval', return_value = "aichat") as mock_eval:
         assert 'fix grammar:\n```\nhelo word\n```' == make_prompt( '', 'fix grammar', 'helo word', '```')
-    with patch('vim.eval', return_value = "") as mock_eval:
+    with patch('vim_ai.context.vim.eval', return_value = "") as mock_eval:
         assert 'fix grammar:\n```\nhelo word\n```' == make_prompt( '', 'fix grammar', 'helo word', '```')
 
 def test_role_config_all_params():

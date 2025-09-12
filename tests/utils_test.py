@@ -1,5 +1,5 @@
 import os
-from utils import parse_include_paths, ai_provider_utils, KnownError
+from vim_ai.utils import parse_include_paths, ai_provider_utils, KnownError
 import pytest
 from unittest.mock import patch
 
@@ -11,8 +11,8 @@ def test_parse_relative_path():
     assert ['tests/resources/test1.include.txt'] == actual
 
 def test_parse_absolute_path():
-    actual = parse_include_paths(f'{root_dir}/tests/resources/test1.include.txt')
-    assert [f'{root_dir}/tests/resources/test1.include.txt'] == actual
+    actual = parse_include_paths('{}/tests/resources/test1.include.txt'.format(root_dir))
+    assert ['{}/tests/resources/test1.include.txt'.format(root_dir)] == actual
 
 def test_parse_relative_path_glob():
     actual = parse_include_paths('**/*.include.txt')
@@ -22,10 +22,10 @@ def test_parse_relative_path_glob():
     ] == actual
 
 def test_parse_absolute_path_glob():
-    actual = parse_include_paths(f'{root_dir}/**/*.include.txt')
+    actual = parse_include_paths('{}/**/*.include.txt'.format(root_dir))
     assert [
-        f'{root_dir}/tests/resources/test1.include.txt',
-        f'{root_dir}/tests/resources/test2.include.txt',
+        '{}/tests/resources/test1.include.txt'.format(root_dir),
+        '{}/tests/resources/test2.include.txt'.format(root_dir),
     ] == actual
 
 @patch.dict(os.environ, {"AI_API_KEY": "env.secret"})

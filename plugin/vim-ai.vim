@@ -7,8 +7,18 @@ endif
 let s:plugin_root = expand('<sfile>:p:h:h')
 
 cal vim_ai_provider#Register('openai', {
-\  'script_path': s:plugin_root . '/py/providers/openai.py',
+\  'script_path': s:plugin_root . '/vim_ai/providers/openai.py',
 \  'class_name': 'OpenAIProvider',
+\})
+
+cal vim_ai_provider#Register('amazonq', {
+\  'script_path': s:plugin_root . '/vim_ai/providers/amazonq.py',
+\  'class_name': 'AmazonQProvider',
+\})
+
+cal vim_ai_provider#Register('bedrock', {
+\  'script_path': s:plugin_root . '/vim_ai/providers/bedrock.py',
+\  'class_name': 'BedrockProvider',
 \})
 
 command! -range -nargs=? -complete=customlist,vim_ai#RoleCompletionComplete AI <line1>,<line2>call vim_ai#AIRun(<range>, {}, <q-args>)

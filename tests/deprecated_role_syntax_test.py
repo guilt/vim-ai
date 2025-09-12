@@ -1,4 +1,4 @@
-from context import make_ai_context, make_prompt
+from vim_ai.context import make_ai_context, make_prompt
 
 default_config = {
   "options": {
@@ -43,7 +43,9 @@ def test_role_config_different_commands():
         'user_instruction': '/deprecated-test-role hello',
         'user_selection': '',
     }
-    context  = make_ai_context({ **base, 'command_type': 'chat' })
+    context_args = base.copy()
+    context_args['command_type'] = 'chat'
+    context  = make_ai_context(context_args)
     actual_config = context['config']
     actual_prompt = context['prompt']
     assert 'model-common' == actual_config['options']['model']
@@ -52,7 +54,9 @@ def test_role_config_different_commands():
     assert 'hello' == actual_prompt
     assert 'https://localhost/chat' == actual_config['options']['endpoint_url']
 
-    context  = make_ai_context({ **base, 'command_type': 'complete' })
+    context_args = base.copy()
+    context_args['command_type'] = 'complete'
+    context  = make_ai_context(context_args)
     actual_config = context['config']
     actual_prompt = context['prompt']
     assert 'model-common' == actual_config['options']['model']
@@ -60,7 +64,9 @@ def test_role_config_different_commands():
     assert 'hello' == actual_prompt
     assert 'https://localhost/complete' == actual_config['options']['endpoint_url']
 
-    context  = make_ai_context({ **base, 'command_type': 'edit' })
+    context_args = base.copy()
+    context_args['command_type'] = 'edit'
+    context  = make_ai_context(context_args)
     actual_config = context['config']
     actual_prompt = context['prompt']
     assert 'model-common' == actual_config['options']['model']

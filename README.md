@@ -133,9 +133,15 @@ If you are interested in more tips or would like to level up your Vim with more 
 
 This is the list of 3rd party provider plugins allowing to use different AI providers.
 
-- [google provider](https://github.com/madox2/vim-ai-provider-google) - Google's Gemini models
+- [Google Provider](https://github.com/madox2/vim-ai-provider-google) - Google's Gemini models
 - [OpenAI Responses API Provider](https://github.com/kevincojean/vim-ai-provider-openai-responses) - OpenAI Responses API compatibility plug-in
 - [OpenAI Provider with MCP support](https://github.com/kracejic/vim-ai-provider-openai-mcp) - OpenAI chat with MCP
+
+### Built-in Providers
+
+- **OpenAI** - Default provider for OpenAI's GPT models, works with vLLM, llama.cpp and OpenAI compatible providers.
+- **Amazon Q** - Amazon Q Developer for code assistance and general AI tasks
+- **Amazon Bedrock** - Access to Claude, Stability AI, and other models via AWS Bedrock (supports chat, completion, and image generation)
 
 In case you are interested in developing one, have a look at reference [google provider](https://github.com/madox2/vim-ai-provider-google).
 Do not forget to open PR updating this list.
@@ -587,6 +593,112 @@ Now you can use the role:
 I was created by Google.
 ```
 
+#### Global Provider Configuration
+
+Instead of configuring each command individually, use the global provider setting:
+
+**Before (3 lines required):**
+```vim
+let g:vim_ai_chat = { "provider": "amazonq" }
+let g:vim_ai_complete = { "provider": "amazonq" }
+let g:vim_ai_edit = { "provider": "amazonq" }
+```
+
+**After (1 line or environment variable):**
+```bash
+# Option 1: Environment variable
+export VIM_AI_PROVIDER=amazonq
+
+# Option 2: .vimrc setting
+let g:vim_ai_provider = "amazonq"
+```
+
+This automatically configures all AI commands (`:AI`, `:AIEdit`, `:AIChat`, `:AIImage`) to use the specified provider.
+
+**Available providers:** `openai` (default), `amazonq`, `bedrock`, or any custom provider
+
+**Priority order:**
+1. `.vimrc` setting (`let g:vim_ai_provider = "..."`)
+2. Environment variable (`$VIM_AI_PROVIDER`)
+3. Default (`"openai"`)
+
+**Advanced usage:** You can still override individual commands:
+```vim
+let g:vim_ai_provider = "amazonq"        # Global setting
+let g:vim_ai_image = { "provider": "openai" }  # Override for images
+```
+
+#### Example: using Amazon Q provider
+
+To use Amazon Q, authenticate using the Q CLI:
+
+```bash
+# Login to Amazon Q
+q login
+```
+
+Then configure roles to use Amazon Q:
+
+```ini
+[amazonq]
+provider = amazonq
+
+[amazonq-code]
+provider = amazonq
+prompt = You are an expert software developer. Help with code-related tasks.
+```
+
+Use Amazon Q for code assistance:
+
+```
+:AIChat /amazonq-code explain this function
+```
+
+#### Example: using Amazon Bedrock provider
+
+To use Amazon Bedrock, ensure AWS CLI is configured with Bedrock access:
+
+```bash
+# Configure AWS CLI (if not already done)
+aws configure
+
+# Test Bedrock access
+aws bedrock-runtime list-foundation-models --region us-east-1
+```
+
+Then configure roles to use Bedrock:
+
+```ini
+[bedrock]
+provider = bedrock
+options.model = anthropic.claude-4-sonnet-20250109-v1:0
+options.region = us-east-1
+options.profile = my-aws-profile
+
+[bedrock-haiku]
+provider = bedrock
+prompt = You are a helpful assistant. Be concise and clear.
+options.model = anthropic.claude-3-5-haiku-20241022-v1:0
+options.region = us-east-1
+options.profile = my-aws-profile
+options.temperature = 0.3
+
+[bedrock-image]
+provider = bedrock
+options.model = amazon.nova-canvas-v1:0
+options.region = us-east-1
+options.profile = my-aws-profile
+options.width = 1024
+options.height = 1024
+```
+
+Use Bedrock for AI assistance:
+
+```
+:AIChat /bedrock-haiku help me with this code
+:AIImage /bedrock-image a beautiful sunset over mountains
+```
+
 ## Key bindings
 
 This plugin does not set any key binding. Create your own bindings in the `.vimrc` to trigger AI commands, for example:
@@ -647,6 +759,37 @@ function! CodeReviewFn(range) range
 endfunction
 command! -range -nargs=? AICodeReview <line1>,<line2>call CodeReviewFn(<range>)
 ```
+
+## Testing
+
+This project includes comprehensive tests to ensure compatibility across Python versions.
+
+### Running Tests
+
+```bash
+# Test all available Python versions (3.5+)
+./run-tests.sh
+
+# Test specific Python version
+./run-tests.sh python3.8
+
+# Test with full path
+./run-tests.sh /path/to/python3.5
+```
+
+### Python Version Compatibility
+
+- **Minimum**: Python 3.4+ (basic functionality)
+- **Fully Tested**: Python 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12
+- **Dependencies**: None (uses only standard library)
+
+The `run-tests.sh` script automatically:
+- Detects available Python versions
+- Installs appropriate pytest versions
+- Runs all tests for each Python version
+- Reports comprehensive results
+
+**Note**: All tests pass on Python 3.4-3.13.
 
 ## Contributing
 

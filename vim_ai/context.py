@@ -4,7 +4,12 @@ import os
 import configparser
 
 if "PYTEST_VERSION" in os.environ:
-    from utils import *
+    from .utils import *
+else:
+    try:
+        from utils import DEFAULT_ROLE_NAME, read_role_files, parse_include_paths, enhance_roles_with_custom_function
+    except ImportError:
+        from .utils import DEFAULT_ROLE_NAME, read_role_files, parse_include_paths, enhance_roles_with_custom_function
 
 context_py_imported = True
 
@@ -30,7 +35,7 @@ def is_deprecated_role_syntax(roles, role):
         'ui', 'ui-complete', 'ui-edit', 'ui-chat',
     ]
     for section in deprecated_sections:
-        if f"{role}.{section}" in roles:
+        if "{}.{}".format(role, section) in roles:
             return True
     return False
 
@@ -39,23 +44,23 @@ def load_roles_with_deprecated_syntax(roles, role):
     return {
         'role_default': {
             'prompt': prompt,
-            'options': dict(roles.get(f"{role}.options", {})),
-            'ui': dict(roles.get(f"{role}.ui", {})),
+            'options': dict(roles.get("{}.options".format(role), {})),
+            'ui': dict(roles.get("{}.ui".format(role), {})),
         },
         'role_complete': {
             'prompt': prompt,
-            'options': dict(roles.get(f"{role}.options-complete", {})),
-            'ui': dict(roles.get(f"{role}.ui-complete", {})),
+            'options': dict(roles.get("{}.options-complete".format(role), {})),
+            'ui': dict(roles.get("{}.ui-complete".format(role), {})),
         },
         'role_edit': {
             'prompt': prompt,
-            'options': dict(roles.get(f"{role}.options-edit", {})),
-            'ui': dict(roles.get(f"{role}.ui-edit", {})),
+            'options': dict(roles.get("{}.options-edit".format(role), {})),
+            'ui': dict(roles.get("{}.ui-edit".format(role), {})),
         },
         'role_chat': {
             'prompt': prompt,
-            'options': dict(roles.get(f"{role}.options-chat", {})),
-            'ui': dict(roles.get(f"{role}.ui-chat", {})),
+            'options': dict(roles.get("{}.options-chat".format(role), {})),
+            'ui': dict(roles.get("{}.ui-chat".format(role), {})),
         },
     }
 
@@ -80,18 +85,18 @@ def load_role_config(role):
     enhance_roles_with_custom_function(roles)
 
     postfixes = ["", ".complete", ".edit", ".chat", ".image"]
-    if not any([f"{role}{postfix}" in roles for postfix in postfixes]):
-        raise Exception(f"Role `{role}` not found")
+    if not any(["{}{}".format(role, postfix) in roles for postfix in postfixes]):
+        raise Exception("Role `{}` not found".format(role))
 
     if is_deprecated_role_syntax(roles, role):
         return load_roles_with_deprecated_syntax(roles, role)
 
     return {
         'role_default': parse_role_section(roles.get(role, {})),
-        'role_complete': parse_role_section(roles.get(f"{role}.complete", {})),
-        'role_edit': parse_role_section(roles.get(f"{role}.edit", {})),
-        'role_chat': parse_role_section(roles.get(f"{role}.chat", {})),
-        'role_image': parse_role_section(roles.get(f"{role}.image", {})),
+        'role_complete': parse_role_section(roles.get("{}.complete".format(role), {})),
+        'role_edit': parse_role_section(roles.get("{}.edit".format(role), {})),
+        'role_chat': parse_role_section(roles.get("{}.chat".format(role), {})),
+        'role_image': parse_role_section(roles.get("{}.image".format(role), {})),
     }
 
 def parse_role_names(prompt):
@@ -132,7 +137,7 @@ def make_selection_prompt(user_selection, user_prompt, config_prompt, selection_
     elif user_selection:
         if selection_boundary and selection_boundary not in user_selection:
             left_boundary, right_boundary = make_selection_boundary(user_selection, selection_boundary)
-            return f"{left_boundary}\n{user_selection}\n{right_boundary}"
+            return "{}\n{}\n{}".format(left_boundary, user_selection, right_boundary)
         else:
             return user_selection
     return ''
@@ -141,11 +146,11 @@ def make_prompt(config_prompt, user_prompt, user_selection, selection_boundary):
     user_prompt = user_prompt.strip()
     delimiter = ":\n" if user_prompt and user_selection else ""
     user_selection = make_selection_prompt(user_selection, user_prompt, config_prompt, selection_boundary)
-    prompt = f"{user_prompt}{delimiter}{user_selection}"
+    prompt = "{}{}{}".format(user_prompt, delimiter, user_selection)
     if not config_prompt:
         return prompt
     delimiter = '' if prompt.startswith(':') else ':\n'
-    prompt = f"{config_prompt}{delimiter}{prompt}"
+    prompt = "{}{}{}".format(config_prompt, delimiter, prompt)
     return prompt
 
 def make_ai_context(params):

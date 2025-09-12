@@ -71,7 +71,9 @@ def run_ai_chat(context):
                 if hasattr(provider_class, "default_options_varname_chat") and provider_class.default_options_varname_chat:
                     default_provider_options = make_options(vim.eval(provider_class.default_options_varname_chat))
 
-                populated_options = {**default_options, **default_provider_options, **config['options']}
+                populated_options = default_options.copy()
+                populated_options.update(default_provider_options)
+                populated_options.update(config['options'])
                 _populate_options(config['provider'], populated_options, {}, show_default = True)
             else:
                 _populate_options(config['provider'], config['options'], default_options, show_default = False)
@@ -97,14 +99,15 @@ def run_ai_chat(context):
     initialize_chat_window()
 
     chat_config = parse_chat_header_config()
-    options = {**config_options, **chat_config['options']}
+    options = config_options.copy()
+    options.update(chat_config['options'])
     provider = chat_config['provider'] or config['provider']
 
     initial_prompt = '\n'.join(options.get('initial_prompt', []))
     initial_messages = parse_chat_messages(initial_prompt)
 
     chat_content = vim.eval('trim(join(getline(1, "$"), "\n"))')
-    print_debug(f"[{command_type}] text:\n" + chat_content)
+    print_debug("[{}] text:\n".format(command_type) + chat_content)
     chat_messages = parse_chat_messages(chat_content)
 
     messages = initial_messages + chat_messages
@@ -133,7 +136,7 @@ def run_ai_chat(context):
                     nonlocal previous_type
                     for chunk in chunks:
                         if previous_type != chunk["type"] or "newsegment" in chunk:
-                            vim.command(f"normal! Go\n<<< {chunk['type']}\n\n")
+                            vim.command("normal! Go\n<<< {}\n\n".format(chunk['type']))
                             previous_type = chunk["type"]
                         yield chunk['content']
 
@@ -171,7 +174,7 @@ class AI_chat_job(threading.Thread):
             for chunk in self.provider.request(self.messages):
                 with self.lock:
                     # For now, we only append whole lines to the buffer
-                    print_debug(f"Received chunk: '{chunk['type']}' => '{chunk['content']}'")
+                    print_debug("Received chunk: '{}' => '{}'".format(chunk['type'], chunk['content']))
                     if self.previous_type != chunk["type"] or "newsegment" in chunk:
                         if self.previous_type != "":
                             self.buffer += "\n"
@@ -190,7 +193,7 @@ class AI_chat_job(threading.Thread):
         except Exception as e:
             with self.lock:
                 self.lines.append("")
-                self.lines.append(f"<<< error getting response: {str(e)}")
+                self.lines.append("<<< error getting response: {}".format(str(e)))
                 self.lines.append("")
                 self.lines.append("```python")
                 self.lines.extend(traceback.format_exc().split("\n"))
@@ -247,17 +250,17 @@ class AI_chat_jobs_pool(object):
         return True
 
     def cancel_job(self, bufnr):
-        print_debug(f"Attempting to cancel job for bufnr {bufnr}")
+        print_debug("Attempting to cancel job for bufnr {}".format(bufnr))
         if bufnr in self.pool:
             job = self.pool[bufnr]
             if not job.is_done():
                 job.cancel()
-                print_debug(f"Cancellation signal sent to job for bufnr {bufnr}")
+                print_debug("Cancellation signal sent to job for bufnr {}".format(bufnr))
                 return True
             else:
-                print_debug(f"Job for bufnr {bufnr} is already done.")
+                print_debug("Job for bufnr {} is already done.".format(bufnr))
                 return False
-        print_debug(f"No active job found for bufnr {bufnr} to cancel.")
+        print_debug("No active job found for bufnr {} to cancel.".format(bufnr))
         return False
 
 ai_job_pool = AI_chat_jobs_pool()
