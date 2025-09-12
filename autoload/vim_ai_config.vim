@@ -1,5 +1,12 @@
 let s:plugin_root = expand('<sfile>:p:h:h')
 
+
+
+let g:vim_ai_endpoint_url = exists('$OPENAI_ENDPOINT_URL') ? $OPENAI_ENDPOINT_URL : 'https://api.openai.com/v1'
+let g:vim_ai_default_text_model = exists('$OPENAI_MODEL') ? $OPENAI_MODEL : 'gpt-4o'
+let g:vim_ai_default_image_model = exists('$OPENAI_IMAGE_MODEL') ? $OPENAI_IMAGE_MODEL : 'dall-e-3'
+let g:vim_ai_max_tokens = exists('$OPENAI_MAX_TOKENS') ? $OPENAI_MAX_TOKENS : 0
+
 " NOTE: selection_boundary and initial_prompt is currently handled outside of provider
 
 let s:initial_complete_prompt =<< trim END
@@ -66,10 +73,10 @@ let g:vim_ai_image_default = {
 
 " openai provider options
 let g:vim_ai_openai_complete = {
-\  "model": "gpt-4o",
-\  "endpoint_url": "https://api.openai.com/v1/chat/completions",
-\  "max_tokens": 0,
-\  "max_completion_tokens": 0,
+\  "model": g:vim_ai_default_text_model,
+\  "endpoint_url": g:vim_ai_endpoint_url."/chat/completions",
+\  "max_tokens": g:vim_ai_max_tokens,
+\  "max_completion_tokens": g:vim_ai_max_tokens,
 \  "temperature": 0.1,
 \  "request_timeout": 20,
 \  "stream": 1,
@@ -90,10 +97,10 @@ let g:vim_ai_openai_complete = {
 \}
 let g:vim_ai_openai_edit = g:vim_ai_openai_complete
 let g:vim_ai_openai_chat = {
-\  "model": "gpt-4o",
-\  "endpoint_url": "https://api.openai.com/v1/chat/completions",
-\  "max_tokens": 0,
-\  "max_completion_tokens": 0,
+\  "model": g:vim_ai_default_text_model,
+\  "endpoint_url": g:vim_ai_endpoint_url."/chat/completions",
+\  "max_tokens": g:vim_ai_max_tokens,
+\  "max_completion_tokens": g:vim_ai_max_tokens,
 \  "temperature": 1,
 \  "request_timeout": 20,
 \  "stream": 1,
@@ -113,8 +120,8 @@ let g:vim_ai_openai_chat = {
 \  "top_p": "",
 \}
 let g:vim_ai_openai_image = {
-\  "model": "dall-e-3",
-\  "endpoint_url": "https://api.openai.com/v1/images/generations",
+\  "model": g:vim_ai_default_image_model,
+\  "endpoint_url": g:vim_ai_endpoint_url."/images/generations",
 \  "quality": "standard",
 \  "size": "1024x1024",
 \  "style": "vivid",
