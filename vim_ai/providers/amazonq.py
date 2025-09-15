@@ -76,7 +76,7 @@ class AmazonQProvider():
                 os.getenv('Q_SET_PARENT_CHECK') == '1')
 
     def _request_via_q_cli(self, messages):
-        """Use Q CLI's chat functionality through subprocess"""
+        """Use Q CLI's chat functionality with streaming support"""
         try:
             # Extract the user's question from the last message
             user_prompt = ""
@@ -91,31 +91,38 @@ class AmazonQProvider():
             
             self.utils.print_debug("amazonq: Sending prompt to Q CLI: {}", user_prompt[:50] + "...")
             
-            # Cross-platform Q CLI execution
+            # Stream responses from Q CLI with tools disabled
             process = subprocess.Popen([
-                'q', 'chat'
-            ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                'q', 'chat', '--trust-tools=', '--no-interactive'
+            ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+              text=True, bufsize=1, universal_newlines=True)
             
-            # Send the prompt via stdin
-            stdout, stderr = process.communicate(input=user_prompt, timeout=30)
+            # Send the prompt
+            process.stdin.write(user_prompt)
+            process.stdin.close()
             
-            if process.returncode == 0 and stdout.strip():
-                # Clean up ANSI escape codes
-                import re
-                response_text = re.sub(r'\x1b\[[0-9;]*m', '', stdout.strip())
-                # Remove the prompt marker
-                response_text = re.sub(r'^>\s*', '', response_text)
-                self.utils.print_debug("amazonq: Q CLI response: {}", response_text[:50] + "...")
-                yield {'type': 'assistant', 'content': response_text}
-            else:
-                error_msg = stderr.strip() if stderr else "No response from Q CLI"
-                self.utils.print_debug("amazonq: Q CLI error: {}", error_msg)
-                yield {'type': 'assistant', 'content': 'Amazon Q encountered an issue: {}'.format(error_msg)}
+            # Stream output line by line, yielding incremental deltas
+            import re
+            while True:
+                line = process.stdout.readline()
+                if not line:
+                    break
+                
+                # Clean ANSI codes and prompt markers from this line
+                clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)
+                clean_line = re.sub(r'^>\s*', '', clean_line)
+                
+                # Yield the cleaned line as an incremental delta
+                if clean_line.strip():
+                    yield {'type': 'assistant', 'content': clean_line}
+            
+            process.wait()
+            
+            if process.returncode != 0:
+                stderr_output = process.stderr.read()
+                error_msg = stderr_output.strip() if stderr_output else "Q CLI error"
+                yield {'type': 'assistant', 'content': 'Amazon Q error: {}'.format(error_msg)}
                     
-        except subprocess.TimeoutExpired:
-            yield {'type': 'assistant', 'content': 'Request timed out. Amazon Q may be processing a complex query.'}
-        except FileNotFoundError:
-            yield {'type': 'assistant', 'content': 'Amazon Q CLI not found. Please install Q CLI and run "q login" to authenticate.'}
         except Exception as e:
             self.utils.print_debug("amazonq: Q CLI request failed: {}", str(e))
             yield {'type': 'assistant', 'content': 'Error connecting to Amazon Q: {}'.format(str(e))}

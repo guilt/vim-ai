@@ -88,38 +88,80 @@ class BedrockProvider():
             model_id = self.options.get('model', 
                 os.environ.get('BEDROCK_MODEL', 'anthropic.claude-4-sonnet-20250109-v1:0'))
             
-            # Call AWS Bedrock via CLI
+            # Check if streaming is enabled (opt-in for backward compatibility)
+            use_streaming = self.options.get('stream', 0)
+            
+            # Prepare request payload
             payload_json = json.dumps(payload)
             payload_b64 = base64.b64encode(payload_json.encode('utf-8')).decode('utf-8')
             
-            cmd = [
-                'aws', 'bedrock-runtime', 'invoke-model',
-                '--model-id', model_id,
-                '--body', payload_b64,
-                '--region', self.options.get('region', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')),
-                '/tmp/bedrock_response.json'
-            ]
-            
-            # Add profile if specified
-            if 'profile' in self.options and self.options['profile']:
-                cmd.extend(['--profile', self.options['profile']])
-            
-            result = subprocess_run_compat(cmd, capture_output=True, text=True, timeout=30)
-            
-            if result.returncode != 0:
-                yield {'type': 'assistant', 'content': 'Bedrock error: {}'.format(result.stderr)}
-                return
-            
-            # Read response
-            with open('/tmp/bedrock_response.json', 'r') as f:
-                response = json.load(f)
-            
-            # Extract content
-            if 'content' in response and len(response['content']) > 0:
-                content = response['content'][0].get('text', '')
-                yield {'type': 'assistant', 'content': content}
+            if use_streaming:
+                # Call AWS Bedrock with streaming
+                cmd = [
+                    'aws', 'bedrock-runtime', 'invoke-model-with-response-stream',
+                    '--model-id', model_id,
+                    '--body', payload_b64,
+                    '--region', self.options.get('region', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
+                ]
+                
+                # Add profile if specified
+                if 'profile' in self.options and self.options['profile']:
+                    cmd.extend(['--profile', self.options['profile']])
+                
+                # Stream response
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                
+                for line in process.stdout:
+                    if line.strip():
+                        try:
+                            # Parse streaming response
+                            chunk = json.loads(line)
+                            if 'chunk' in chunk and 'bytes' in chunk['chunk']:
+                                chunk_data = base64.b64decode(chunk['chunk']['bytes']).decode('utf-8')
+                                chunk_json = json.loads(chunk_data)
+                                
+                                if 'delta' in chunk_json and 'text' in chunk_json['delta']:
+                                    text_delta = chunk_json['delta']['text']
+                                    # Yield only the incremental delta, not accumulated content
+                                    yield {'type': 'assistant', 'content': text_delta}
+                        except (json.JSONDecodeError, KeyError):
+                            continue
+                
+                process.wait()
+                
+                if process.returncode != 0:
+                    stderr_output = process.stderr.read()
+                    yield {'type': 'assistant', 'content': 'Bedrock streaming error: {}'.format(stderr_output)}
             else:
-                yield {'type': 'assistant', 'content': 'No response from Bedrock'}
+                # Non-streaming fallback (for tests and compatibility)
+                cmd = [
+                    'aws', 'bedrock-runtime', 'invoke-model',
+                    '--model-id', model_id,
+                    '--body', payload_b64,
+                    '--region', self.options.get('region', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')),
+                    '/tmp/bedrock_response.json'
+                ]
+                
+                # Add profile if specified
+                if 'profile' in self.options and self.options['profile']:
+                    cmd.extend(['--profile', self.options['profile']])
+                
+                result = subprocess_run_compat(cmd, capture_output=True, text=True, timeout=30)
+                
+                if result.returncode != 0:
+                    yield {'type': 'assistant', 'content': 'Bedrock error: {}'.format(result.stderr)}
+                    return
+                
+                # Read response
+                with open('/tmp/bedrock_response.json', 'r') as f:
+                    response = json.load(f)
+                
+                # Extract content
+                if 'content' in response and len(response['content']) > 0:
+                    content = response['content'][0].get('text', '')
+                    yield {'type': 'assistant', 'content': content}
+                else:
+                    yield {'type': 'assistant', 'content': 'No response from Bedrock'}
                 
         except subprocess.TimeoutExpired:
             yield {'type': 'assistant', 'content': 'Bedrock request timed out. The model may be processing a complex query.'}
