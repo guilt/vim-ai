@@ -1,10 +1,25 @@
 import sys
-from typing import Union, List, Tuple, Any, Dict
+
+try:
+    from typing import Union, List, Tuple, Any, Dict
+except ImportError:
+    # Fallback for Python < 3.5 without typing module
+    Union = None
+    List = list
+    Tuple = tuple
+    Any = None
+    Dict = dict
 
 if sys.version_info >= (3, 9):
-    from collections.abc import Sequence, Mapping, Iterator
+    try:
+        from collections.abc import Sequence, Mapping, Iterator
+    except ImportError:
+        from collections import Sequence, Mapping, Iterator
 else:
-    from typing import Sequence, Mapping, Iterator
+    try:
+        from typing import Sequence, Mapping, Iterator
+    except ImportError:
+        from collections import Sequence, Mapping, Iterator
 
 try:
     from typing import Protocol
@@ -38,7 +53,7 @@ AIMessage = dict
 AIResponseChunk = dict
 AIImageResponseChunk = dict
 
-AIMessageContent = Union[AITextContent, AIImageUrlContent]
+AIMessageContent = Union[AITextContent, AIImageUrlContent] if Union else dict
 
 class AIUtils(Protocol):
     def print_debug(self, text, *args):

@@ -16,6 +16,9 @@ __pycache__/
 htmlcov/
 .tox/
 
+# Docker
+Dockerfile*
+
 # IDEs
 .vscode/
 .idea/

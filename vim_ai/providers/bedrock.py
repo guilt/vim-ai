@@ -1,35 +1,16 @@
-from collections.abc import Sequence, Mapping, Iterator
-from typing import Any
 import urllib.request
 import os
 import json
 import base64
-import vim
 import subprocess
 import sys
+import vim
 
-if "VIMAI_DUMMY_IMPORT" in os.environ:
-    import sys
-    import os
-    
-    # Load utils and ai_types modules
-    utils_path = os.path.join(os.path.dirname(__file__), '..', 'utils.py')
-    exec(open(utils_path).read(), globals())
-    
-    ai_types_path = os.path.join(os.path.dirname(__file__), '..', 'ai_types.py')
-    vim_ai_types = load_module_compat('vim_ai_types', ai_types_path)
-    
-    # Functions are now available in globals()
-    
-    AIMessage = vim_ai_types.AIMessage
-    AIResponseChunk = vim_ai_types.AIResponseChunk
-    AIUtils = vim_ai_types.AIUtils
-    AIProvider = vim_ai_types.AIProvider
-    AICommandType = vim_ai_types.AICommandType
-    AIImageResponseChunk = vim_ai_types.AIImageResponseChunk
-else:
-    from vim_ai.ai_types import AIMessage, AIResponseChunk, AIUtils, AIProvider, AICommandType, AIImageResponseChunk
-    from vim_ai.utils import subprocess_run_compat
+from vim_ai.provider_imports import setup_provider_imports
+_imports = setup_provider_imports()
+globals().update(_imports)
+from vim_ai.ai_typing import Any, Sequence, Mapping, Iterator, List
+from vim_ai.utils import subprocess_run_compat
 
 class BedrockProvider():
 
@@ -72,101 +53,112 @@ class BedrockProvider():
             return False
 
     def _request_via_aws_cli(self, messages):
-        """Use AWS CLI to call Bedrock"""
+        """Use AWS CLI to call Bedrock using the converse API"""
         try:
-            # Convert messages to Bedrock format
-            bedrock_messages = self._format_messages_for_bedrock(messages)
+            # Convert messages to Bedrock converse format
+            converse_messages = self._format_messages_for_converse(messages)
             
-            # Prepare request payload
+            # Get model ID - use Nova Micro as default since it supports on-demand
+            model_id = self.options.get('model', os.environ.get('BEDROCK_MODEL', 'anthropic.claude-4-sonnet-20250109-v1:0'))
+            
+            # Prepare converse API payload
             payload = {
-                "messages": bedrock_messages,
-                "max_tokens": self.options.get('max_tokens', 4000),
-                "temperature": self.options.get('temperature', 0.7),
-                "anthropic_version": "bedrock-2023-05-31"
+                "modelId": model_id,
+                "messages": converse_messages,
+                "inferenceConfig": {
+                    "maxTokens": self.options.get('max_tokens', 4000),
+                    "temperature": self.options.get('temperature', 0.7)
+                }
             }
             
-            model_id = self.options.get('model', 
-                os.environ.get('BEDROCK_MODEL', 'anthropic.claude-4-sonnet-20250109-v1:0'))
-            
-            # Check if streaming is enabled (opt-in for backward compatibility)
-            use_streaming = self.options.get('stream', 0)
-            
-            # Prepare request payload
-            payload_json = json.dumps(payload)
-            payload_b64 = base64.b64encode(payload_json.encode('utf-8')).decode('utf-8')
-            
-            if use_streaming:
-                # Call AWS Bedrock with streaming
-                cmd = [
-                    'aws', 'bedrock-runtime', 'invoke-model-with-response-stream',
-                    '--model-id', model_id,
-                    '--body', payload_b64,
-                    '--region', self.options.get('region', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
-                ]
-                
-                # Add profile if specified
-                if 'profile' in self.options and self.options['profile']:
-                    cmd.extend(['--profile', self.options['profile']])
-                
-                # Stream response
-                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                
-                for line in process.stdout:
-                    if line.strip():
-                        try:
-                            # Parse streaming response
-                            chunk = json.loads(line)
-                            if 'chunk' in chunk and 'bytes' in chunk['chunk']:
-                                chunk_data = base64.b64decode(chunk['chunk']['bytes']).decode('utf-8')
-                                chunk_json = json.loads(chunk_data)
-                                
-                                if 'delta' in chunk_json and 'text' in chunk_json['delta']:
-                                    text_delta = chunk_json['delta']['text']
-                                    # Yield only the incremental delta, not accumulated content
-                                    yield {'type': 'assistant', 'content': text_delta}
-                        except (json.JSONDecodeError, KeyError):
-                            continue
-                
-                process.wait()
-                
-                if process.returncode != 0:
-                    stderr_output = process.stderr.read()
-                    yield {'type': 'assistant', 'content': 'Bedrock streaming error: {}'.format(stderr_output)}
-            else:
-                # Non-streaming fallback (for tests and compatibility)
-                cmd = [
-                    'aws', 'bedrock-runtime', 'invoke-model',
-                    '--model-id', model_id,
-                    '--body', payload_b64,
-                    '--region', self.options.get('region', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')),
-                    '/tmp/bedrock_response.json'
-                ]
-                
-                # Add profile if specified
-                if 'profile' in self.options and self.options['profile']:
-                    cmd.extend(['--profile', self.options['profile']])
-                
-                result = subprocess_run_compat(cmd, capture_output=True, text=True, timeout=30)
-                
-                if result.returncode != 0:
-                    yield {'type': 'assistant', 'content': 'Bedrock error: {}'.format(result.stderr)}
-                    return
-                
-                # Read response
-                with open('/tmp/bedrock_response.json', 'r') as f:
-                    response = json.load(f)
-                
-                # Extract content
-                if 'content' in response and len(response['content']) > 0:
-                    content = response['content'][0].get('text', '')
-                    yield {'type': 'assistant', 'content': content}
+            # Add system message if present
+            system_messages = [msg for msg in messages if msg.get('role') == 'system']
+            if system_messages:
+                # Use the last system message
+                system_content = system_messages[-1].get('content', '')
+                if isinstance(system_content, list):
+                    # Extract text from content parts
+                    system_text = '\n'.join([part.get('text', '') for part in system_content if part.get('type') == 'text'])
                 else:
-                    yield {'type': 'assistant', 'content': 'No response from Bedrock'}
+                    system_text = system_content
+                
+                if system_text.strip():
+                    payload["system"] = [{"text": system_text}]
+            
+            # Use converse API
+            cmd = [
+                'aws', 'bedrock-runtime', 'converse',
+                '--cli-input-json', json.dumps(payload),
+                '--region', self.options.get('region', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
+            ]
+            
+            # Add profile if specified
+            if 'profile' in self.options and self.options['profile']:
+                cmd.extend(['--profile', self.options['profile']])
+            
+            result = subprocess_run_compat(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode != 0:
+                error_msg = result.stderr
+                # Handle specific error cases
+                if "isn't supported" in error_msg and "inference profile" in error_msg:
+                    yield {'type': 'assistant', 'content': 'Model {} requires an inference profile. Try using amazon.nova-micro-v1:0 or amazon.nova-lite-v1:0 instead.'.format(model_id)}
+                else:
+                    yield {'type': 'assistant', 'content': 'Bedrock error: {}'.format(error_msg)}
+                return
+            
+            # Parse response
+            try:
+                response = json.loads(result.stdout)
+            except json.JSONDecodeError as e:
+                yield {'type': 'assistant', 'content': 'Error parsing Bedrock response: {}'.format(str(e))}
+                return
+            
+            # Extract content from converse API response
+            content = ""
+            if 'output' in response and 'message' in response['output']:
+                message = response['output']['message']
+                if 'content' in message and len(message['content']) > 0:
+                    content = message['content'][0].get('text', '')
+            
+            if content:
+                yield {'type': 'assistant', 'content': content}
+            else:
+                yield {'type': 'assistant', 'content': 'No response content from Bedrock'}
                 
         except subprocess.TimeoutExpired:
             yield {'type': 'assistant', 'content': 'Bedrock request timed out. The model may be processing a complex query.'}
         except Exception as e:
             yield {'type': 'assistant', 'content': 'Error connecting to Bedrock: {}'.format(str(e))}
+
+    def _format_messages_for_converse(self, messages):
+        """Convert vim-ai messages to Bedrock converse format"""
+        converse_messages = []
+        
+        for msg in messages:
+            role = msg['role']
+            if role == 'system':
+                # System messages are handled separately in converse API
+                continue
+                
+            content_parts = msg.get('content', [])
+            if isinstance(content_parts, str):
+                content_text = content_parts
+            else:
+                # Extract text from content parts
+                text_parts = []
+                for part in content_parts:
+                    if part.get('type') == 'text':
+                        text_parts.append(part.get('text', ''))
+                content_text = '\n'.join(text_parts)
+            
+            if content_text.strip():
+                converse_messages.append({
+                    'role': 'user' if role == 'user' else 'assistant',
+                    'content': [{'text': content_text}]
+                })
+        
+        return converse_messages
 
     def _format_messages_for_bedrock(self, messages):
         """Convert vim-ai messages to Bedrock format"""

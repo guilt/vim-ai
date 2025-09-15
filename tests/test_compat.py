@@ -26,18 +26,18 @@ def test_subprocess_run_compat_exists():
     assert hasattr(result, 'returncode')
     assert hasattr(result, 'stdout')
 
-def test_ai_types_imports():
-    """Test that ai_types module imports successfully"""
-    from vim_ai import ai_types
+def test_ai_typing_imports():
+    """Test that ai_typing module imports successfully"""
+    from vim_ai import ai_typing
     
     # Test that basic types are available
-    assert hasattr(ai_types, 'AIMessage')
-    assert hasattr(ai_types, 'AIProvider')
-    assert hasattr(ai_types, 'AIUtils')
+    assert hasattr(ai_typing, 'AIMessage')
+    assert hasattr(ai_typing, 'AIProvider')
+    assert hasattr(ai_typing, 'AIUtils')
 
-def test_ai_types_protocol_fallback():
+def test_ai_typing_protocol_fallback():
     """Test Protocol class exists (either real or fallback)"""
-    from vim_ai.ai_types import Protocol
+    from vim_ai.ai_typing import Protocol
     
     # Should be able to create a class that inherits from Protocol
     class TestProtocol(Protocol):
@@ -46,9 +46,9 @@ def test_ai_types_protocol_fallback():
     
     assert TestProtocol is not None
 
-def test_ai_types_literal_fallback():
+def test_ai_typing_literal_fallback():
     """Test Literal function exists (either real or fallback)"""
-    from vim_ai.ai_types import Literal
+    from vim_ai.ai_typing import Literal
     
     # In Python 3.8+, Literal is a real type, in older versions it's our fallback
     # Just test that it exists and can be used in type annotations
@@ -61,9 +61,9 @@ def test_ai_types_literal_fallback():
         # Just ensure Literal exists
         assert Literal is not None
 
-def test_ai_types_typeddict_fallback():
+def test_ai_typing_typeddict_fallback():
     """Test TypedDict class exists (either real or fallback)"""
-    from vim_ai.ai_types import TypedDict
+    from vim_ai.ai_typing import TypedDict
     
     # Should be able to create a subclass
     class TestDict(TypedDict):

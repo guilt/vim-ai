@@ -59,8 +59,32 @@ class TestBedrockProvider(unittest.TestCase):
             
             self.assertEqual(bedrock_messages, expected)
 
-    def test_message_formatting_with_content_parts(self):
-        """Test message formatting with content parts"""
+    def test_message_formatting_converse(self):
+        """Test message formatting for Bedrock converse API"""
+        with patch('vim.eval') as mock_eval:
+            mock_eval.side_effect = lambda x: "0" if "exists" in x else {}
+            provider = BedrockProvider('chat', {}, self.utils)
+            
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant"},
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi there!"},
+                {"role": "user", "content": "How are you?"}
+            ]
+            
+            converse_messages = provider._format_messages_for_converse(messages)
+            
+            # System messages should be filtered out in converse format
+            expected = [
+                {"role": "user", "content": [{"text": "Hello"}]},
+                {"role": "assistant", "content": [{"text": "Hi there!"}]},
+                {"role": "user", "content": [{"text": "How are you?"}]}
+            ]
+            
+            self.assertEqual(converse_messages, expected)
+
+    def test_message_formatting_converse_with_content_parts(self):
+        """Test converse message formatting with content parts"""
         with patch('vim.eval') as mock_eval:
             mock_eval.side_effect = lambda x: "0" if "exists" in x else {}
             provider = BedrockProvider('chat', {}, self.utils)
@@ -75,13 +99,13 @@ class TestBedrockProvider(unittest.TestCase):
                 }
             ]
             
-            bedrock_messages = provider._format_messages_for_bedrock(messages)
+            converse_messages = provider._format_messages_for_converse(messages)
             
             expected = [
-                {"role": "user", "content": "Hello\nWorld"}
+                {"role": "user", "content": [{"text": "Hello\nWorld"}]}
             ]
             
-            self.assertEqual(bedrock_messages, expected)
+            self.assertEqual(converse_messages, expected)
 
     @patch('vim_ai.providers.bedrock.subprocess_run_compat')
     def test_aws_cli_available_success(self, mock_run):
@@ -125,24 +149,23 @@ class TestBedrockProvider(unittest.TestCase):
             
             self.assertFalse(result)
 
-    @patch('builtins.open')
     @patch('vim_ai.providers.bedrock.subprocess_run_compat')
-    def test_request_via_aws_cli_success(self, mock_run, mock_open):
-        """Test successful AWS CLI request"""
+    def test_request_via_aws_cli_success(self, mock_run):
+        """Test successful AWS CLI request using converse API"""
         with patch('vim.eval') as mock_eval:
             mock_eval.side_effect = lambda x: "0" if "exists" in x else {}
             
-            # Mock successful AWS CLI call
+            # Mock successful AWS CLI call with converse API response
+            mock_response = {
+                "output": {
+                    "message": {
+                        "content": [{"text": "Hello! How can I help you?"}]
+                    }
+                }
+            }
             mock_run.return_value.returncode = 0
             mock_run.return_value.stderr = ""
-            
-            # Mock file read
-            mock_response = {
-                "content": [{"text": "Hello! How can I help you?"}]
-            }
-            mock_file = MagicMock()
-            mock_file.__enter__.return_value.read.return_value = json.dumps(mock_response)
-            mock_open.return_value = mock_file
+            mock_run.return_value.stdout = json.dumps(mock_response)
             
             provider = BedrockProvider('chat', {
                 'model': 'anthropic.claude-4-sonnet-20250109-v1:0',

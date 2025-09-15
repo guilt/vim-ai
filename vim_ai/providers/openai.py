@@ -1,13 +1,12 @@
-from collections.abc import Sequence, Mapping, Iterator
-from typing import Any, List
 import urllib.request
 import os
 import json
 import vim
 
-if "VIMAI_DUMMY_IMPORT" in os.environ:
-    # TODO: figure out how to properly use imports/modules in vim, dev environment, pytest
-    from vim_ai.ai_types import AIMessage, AIResponseChunk, AIUtils, AIProvider, AICommandType, AIImageResponseChunk
+from vim_ai.provider_imports import setup_provider_imports
+_imports = setup_provider_imports()
+globals().update(_imports)
+from vim_ai.ai_typing import List
 
 class OpenAIProvider():
 

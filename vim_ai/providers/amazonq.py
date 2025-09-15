@@ -1,5 +1,3 @@
-from collections.abc import Sequence, Mapping, Iterator
-from typing import Any
 import urllib.request
 import os
 import json
@@ -7,28 +5,10 @@ import vim
 import subprocess
 import sys
 
-if "VIMAI_DUMMY_IMPORT" in os.environ:
-    import sys
-    import os
-    
-    # Load utils and ai_types modules
-    utils_path = os.path.join(os.path.dirname(__file__), '..', 'utils.py')
-    exec(open(utils_path).read(), globals())
-    
-    ai_types_path = os.path.join(os.path.dirname(__file__), '..', 'ai_types.py')
-    vim_ai_types = load_module_compat('vim_ai_types', ai_types_path)
-    
-    # Functions are now available in globals()
-    
-    AIMessage = vim_ai_types.AIMessage
-    AIResponseChunk = vim_ai_types.AIResponseChunk
-    AIUtils = vim_ai_types.AIUtils
-    AIProvider = vim_ai_types.AIProvider
-    AICommandType = vim_ai_types.AICommandType
-    AIImageResponseChunk = vim_ai_types.AIImageResponseChunk
-else:
-    from vim_ai.ai_types import AIMessage, AIResponseChunk, AIUtils, AIProvider, AICommandType, AIImageResponseChunk
-    from vim_ai.utils import subprocess_run_compat
+from vim_ai.provider_imports import setup_provider_imports
+_imports = setup_provider_imports()
+globals().update(_imports)
+from vim_ai.ai_typing import Any, Sequence, Mapping, Iterator
 
 class AmazonQProvider():
 
