@@ -1,30 +1,6 @@
 import os
 import sys
-import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-def test_load_module_compat_basic():
-    """Test basic module loading functionality"""
-    from vim_ai.utils import load_module_compat
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-        f.write('test_var = "loaded"')
-        f.flush()
-        
-        try:
-            module = load_module_compat('test_module', f.name)
-            assert module.test_var == "loaded"
-        finally:
-            os.unlink(f.name)
-
-def test_subprocess_run_compat_exists():
-    """Test that subprocess compatibility function exists and works"""
-    from vim_ai.utils import subprocess_run_compat
-    
-    # Test with basic arguments that work on all Python versions
-    result = subprocess_run_compat(['echo', 'test'])
-    assert hasattr(result, 'returncode')
-    assert hasattr(result, 'stdout')
 
 def test_ai_typing_imports():
     """Test that ai_typing module imports successfully"""

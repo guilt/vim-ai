@@ -4,17 +4,13 @@ let g:vim_ai_amazonq_max_tokens = exists('$AMAZONQ_MAX_TOKENS') ? $AMAZONQ_MAX_T
 let s:amazonq_complete_prompt =<< trim END
 >>> system
 
-You are a general assistant.
-Answer shortly, consisely and only what you are asked.
-Do not provide any explanantion or comments if not requested.
-If you answer in a code, do not wrap it in markdown code block.
+You are a general assistant. Answer shortly, concisely and only what you are asked. Do not provide any explanation or comments if not requested. If you answer in a code, do not wrap it in markdown code block.
 END
 
 let s:amazonq_chat_prompt =<< trim END
 >>> system
 
-You are a general assistant.
-If you attach a code block add syntax type after ``` to enable syntax highlighting.
+You are a general assistant. Answer shortly, concisely and only what you are asked. Do not provide any explanation or comments if not requested. If you attach a code block add syntax type after ``` to enable syntax highlighting.
 END
 
 let g:vim_ai_amazonq_complete = {
@@ -25,7 +21,7 @@ let g:vim_ai_amazonq_complete = {
 \  "request_timeout": 30,
 \  "stream": 1,
 \  "auth_type": "bearer",
-\  "token_file_path": "~/.config/amazonq.token",
+\  "token_file_path": expand("~/.config/amazonq.token"),
 \  "token_load_fn": "",
 \  "initial_prompt": s:amazonq_complete_prompt,
 \}
@@ -38,7 +34,7 @@ let g:vim_ai_amazonq_chat = {
 \  "request_timeout": 30,
 \  "stream": 1,
 \  "auth_type": "bearer",
-\  "token_file_path": "~/.config/amazonq.token",
+\  "token_file_path": expand("~/.config/amazonq.token"),
 \  "token_load_fn": "",
 \  "initial_prompt": s:amazonq_chat_prompt,
 \}

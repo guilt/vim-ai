@@ -33,13 +33,8 @@ class AmazonQProvider():
         if not self._is_q_cli_available():
             return iter([{'type': 'assistant', 'content': 'Amazon Q CLI not found. Please install Q CLI and run "q login" to authenticate.'}])
         
-        # Check if we're in Q CLI environment
-        if self._is_q_cli_environment():
-            self.utils.print_debug("amazonq: Using Q CLI environment")
-            return self._request_via_q_cli(messages)
-        else:
-            self.utils.print_debug("amazonq: Q CLI not available")
-            return iter([{'type': 'assistant', 'content': 'Amazon Q provider requires Q CLI environment.'}])
+        self.utils.print_debug("amazonq: Using Q CLI")
+        return self._request_via_q_cli(messages)
 
     def _is_q_cli_available(self):
         """Check if Q CLI command is available"""
@@ -71,18 +66,17 @@ class AmazonQProvider():
             
             self.utils.print_debug("amazonq: Sending prompt to Q CLI: {}", user_prompt[:50] + "...")
             
-            # Stream responses from Q CLI with tools disabled
-            process = subprocess.Popen([
-                'q', 'chat', '--trust-tools=', '--no-interactive'
-            ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-              text=True, bufsize=1, universal_newlines=True)
+            # Use q chat command with proper arguments
+            cmd = ['q', 'chat', '--no-interactive']
             
-            # Send the prompt
-            process.stdin.write(user_prompt)
-            process.stdin.close()
+            # Stream responses from Q CLI
+            process = subprocess.Popen(cmd + [user_prompt], 
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                                     text=True, bufsize=1, universal_newlines=True)
             
             # Stream output line by line, yielding incremental deltas
             import re
+            response_content = ""
             while True:
                 line = process.stdout.readline()
                 if not line:
@@ -92,6 +86,9 @@ class AmazonQProvider():
                 clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)
                 clean_line = re.sub(r'^>\s*', '', clean_line)
                 
+                # Accumulate response content
+                response_content += clean_line
+                
                 # Yield the cleaned line as an incremental delta
                 if clean_line.strip():
                     yield {'type': 'assistant', 'content': clean_line}
@@ -100,8 +97,12 @@ class AmazonQProvider():
             
             if process.returncode != 0:
                 stderr_output = process.stderr.read()
-                error_msg = stderr_output.strip() if stderr_output else "Q CLI error"
-                yield {'type': 'assistant', 'content': 'Amazon Q error: {}'.format(error_msg)}
+                error_msg = stderr_output.strip() if stderr_output else "Unknown Q CLI error"
+                self.utils.print_debug("amazonq: Q CLI error (code {}): {}", process.returncode, error_msg)
+                
+                # If we got no response content, yield the error
+                if not response_content.strip():
+                    yield {'type': 'assistant', 'content': 'Q Error: {}'.format(error_msg)}
                     
         except Exception as e:
             self.utils.print_debug("amazonq: Q CLI request failed: {}", str(e))

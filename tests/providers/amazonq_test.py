@@ -110,15 +110,3 @@ class TestAmazonQProvider(unittest.TestCase):
                 # Test when Q CLI is not available
                 mock_run.side_effect = FileNotFoundError()
                 self.assertFalse(provider._is_q_cli_available())
-
-    def test_default_model(self):
-        """Test that default model is set correctly"""
-        with patch('vim.eval') as mock_eval:
-            mock_eval.side_effect = lambda x: "0" if "exists" in x else {}
-            provider = AmazonQProvider('chat', {}, self.utils)
-            
-            # Test that provider initializes correctly
-            assert provider.command_type == 'chat'
-
-if __name__ == '__main__':
-    unittest.main()

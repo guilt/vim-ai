@@ -89,11 +89,18 @@ if !exists("g:vim_ai_debug")
   let g:vim_ai_debug = 0
 endif
 
+if has("win32") || has("win64")
+  let s:temp_dir = exists('$TEMP')? $TEMP: expand("$WINDIR") . '\Temp'
+else
+  let s:temp_dir = exists('$TMPDIR')? $TMPDIR: '/tmp'
+endif
+let g:vim_ai_temp_dir = s:temp_dir
+
 if !exists("g:vim_ai_debug_log_file")
-  let g:vim_ai_debug_log_file = "/tmp/vim_ai_debug.log"
+  let g:vim_ai_debug_log_file = g:vim_ai_temp_dir . '/vim_ai_debug.log'
 endif
 if !exists("g:vim_ai_token_file_path")
-  let g:vim_ai_token_file_path = "~/.config/openai.token"
+  let g:vim_ai_token_file_path = expand("~/.config/openai.token")
 endif
 if !exists("g:vim_ai_token_load_fn")
   let g:vim_ai_token_load_fn = ""

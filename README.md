@@ -671,14 +671,14 @@ Then configure roles to use Bedrock:
 ```ini
 [bedrock]
 provider = bedrock
-options.model = anthropic.claude-4-sonnet-20250109-v1:0
+options.model = amazon.nova-micro-v1:0
 options.region = us-east-1
 options.profile = my-aws-profile
 
-[bedrock-haiku]
+[bedrock-lite]
 provider = bedrock
 prompt = You are a helpful assistant. Be concise and clear.
-options.model = anthropic.claude-3-5-haiku-20241022-v1:0
+options.model = amazon.nova-lite-v1:0
 options.region = us-east-1
 options.profile = my-aws-profile
 options.temperature = 0.3
@@ -695,7 +695,7 @@ options.height = 1024
 Use Bedrock for AI assistance:
 
 ```
-:AIChat /bedrock-haiku help me with this code
+:AIChat /bedrock-lite help me with this code
 :AIImage /bedrock-image a beautiful sunset over mountains
 ```
 

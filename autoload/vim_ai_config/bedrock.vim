@@ -1,24 +1,20 @@
 " Bedrock provider configuration
-let g:vim_ai_bedrock_text_model = exists('$BEDROCK_MODEL') ? $BEDROCK_MODEL : 'anthropic.claude-4-sonnet-20250109-v1:0'
+let g:vim_ai_bedrock_text_model = exists('$BEDROCK_MODEL') ? $BEDROCK_MODEL : 'amazon.nova-micro-v1:0'
 let g:vim_ai_bedrock_image_model = exists('$BEDROCK_IMAGE_MODEL') ? $BEDROCK_IMAGE_MODEL : 'amazon.nova-canvas-v1:0'
 let g:vim_ai_bedrock_region = exists('$AWS_DEFAULT_REGION') ? $AWS_DEFAULT_REGION : 'us-east-1'
 let g:vim_ai_bedrock_profile = exists('$AWS_PROFILE') ? $AWS_PROFILE : ''
-let g:vim_ai_bedrock_max_tokens = exists('$BEDROCK_MAX_TOKENS') ? $BEDROCK_MAX_TOKENS : (exists('$MAX_TOKENS') ? $MAX_TOKENS : 0)
+let g:vim_ai_bedrock_max_tokens = exists('$BEDROCK_MAX_TOKENS') ? $BEDROCK_MAX_TOKENS : (exists('$MAX_TOKENS') ? $MAX_TOKENS : 4000)
 
 let s:bedrock_complete_prompt =<< trim END
 >>> system
 
-You are a general assistant.
-Answer shortly, consisely and only what you are asked.
-Do not provide any explanantion or comments if not requested.
-If you answer in a code, do not wrap it in markdown code block.
+You are a general assistant. Answer shortly, concisely and only what you are asked. Do not provide any explanation or comments if not requested. If you answer in a code, do not wrap it in markdown code block.
 END
 
 let s:bedrock_chat_prompt =<< trim END
 >>> system
 
-You are a general assistant.
-If you attach a code block add syntax type after ``` to enable syntax highlighting.
+You are a general assistant. Answer shortly, concisely and only what you are asked. Do not provide any explanation or comments if not requested. If you attach a code block add syntax type after ``` to enable syntax highlighting.
 END
 
 let g:vim_ai_bedrock_complete = {
