@@ -7,6 +7,16 @@ def test_role_completion():
         'test-role',
         'deprecated-test-role-simple',
         'deprecated-test-role',
+        # context-aware roles
+        'codebase',
+        'refactor',
+        'debug',
+        'review',
+        'architect',
+        'test',
+        'docs',
+        'git',
+        'project',
     }
 
 def test_role_chat_only():
@@ -24,6 +34,16 @@ def test_role_chat_only():
         'tab',
         'populate',
         'populate-all',
+        # context-aware roles
+        'codebase',
+        'refactor',
+        'debug',
+        'review',
+        'architect',
+        'test',
+        'docs',
+        'git',
+        'project',
     }
 
 def test_explicit_image_roles():

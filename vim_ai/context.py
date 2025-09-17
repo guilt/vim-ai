@@ -153,6 +153,83 @@ def make_prompt(config_prompt, user_prompt, user_selection, selection_boundary):
     prompt = "{}{}{}".format(config_prompt, delimiter, prompt)
     return prompt
 
+def enhance_prompt_with_context(prompt, roles, command_type):
+    """Enhance prompt with automatic context for Kiro-like roles"""
+    context_roles = ['codebase', 'refactor', 'debug', 'review', 'architect', 'test', 'docs', 'project']
+    
+    # Check if any context-aware role is being used
+    needs_context = any(role in context_roles for role in roles)
+    
+    if not needs_context:
+        return prompt
+    
+    try:
+        # Get current file context
+        current_file = vim.eval('expand("%:p")')
+        if not current_file:
+            return prompt
+        
+        # Build context information
+        context_parts = []
+        
+        # Add current file info
+        try:
+            filetype = vim.eval('&filetype')
+            if filetype:
+                context_parts.append("Current file: {} (language: {})".format(current_file, filetype))
+        except:
+            context_parts.append("Current file: {}".format(current_file))
+        
+        # Add project root context
+        try:
+            cwd = vim.eval('getcwd()')
+            rel_path = os.path.relpath(current_file, cwd) if current_file.startswith(cwd) else current_file
+            context_parts.append("Project root: {}".format(cwd))
+            context_parts.append("Relative path: {}".format(rel_path))
+        except:
+            pass
+        
+        # Add basic project structure for specific roles
+        if any(role in ['codebase', 'architect', 'project'] for role in roles):
+            try:
+                # Get basic file listing
+                import glob
+                common_patterns = ['*.py', '*.js', '*.ts', '*.java', '*.go', '*.rs', '*.cpp', '*.c', '*.h']
+                project_files = []
+                for pattern in common_patterns:
+                    files = glob.glob(os.path.join(cwd, '**', pattern), recursive=True)
+                    project_files.extend([os.path.relpath(f, cwd) for f in files[:5]])  # Limit to 5 per type
+                
+                if project_files:
+                    context_parts.append("Key project files:")
+                    for f in sorted(set(project_files))[:20]:  # Limit total files
+                        context_parts.append("  {}".format(f))
+            except:
+                pass
+        
+        # Add git context for git role
+        if 'git' in roles:
+            try:
+                import subprocess
+                result = subprocess.run(['git', 'status', '--porcelain'], 
+                                      capture_output=True, text=True, timeout=5, cwd=cwd)
+                if result.returncode == 0 and result.stdout.strip():
+                    context_parts.append("Git status:")
+                    for line in result.stdout.strip().split('\n')[:10]:  # Limit lines
+                        context_parts.append("  {}".format(line))
+            except:
+                pass
+        
+        if context_parts:
+            context_info = '\n'.join(context_parts)
+            return "{}\n\n{}".format(context_info, prompt)
+    
+    except Exception as e:
+        # If context enhancement fails, just return original prompt
+        print_debug("Context enhancement failed: {}".format(e))
+    
+    return prompt
+
 def make_ai_context(params):
     config_default = params['config_default']
     config_extension = params['config_extension']
@@ -165,6 +242,9 @@ def make_ai_context(params):
     selection_boundary = final_config['options'].get('selection_boundary', '')
     config_prompt = final_config.get('prompt', '')
     prompt = make_prompt(config_prompt, user_prompt, user_selection, selection_boundary)
+    
+    # Enhance prompt with automatic context for Kiro-like roles
+    prompt = enhance_prompt_with_context(prompt, roles, command_type)
 
     return {
         'command_type': command_type,

@@ -3,6 +3,8 @@
 This plugin adds Artificial Intelligence (AI) capabilities to your Vim and Neovim.
 You can generate code, edit text, or have an interactive conversation with GPT models, all powered by OpenAI's API.
 
+> **🚀 Enhanced Fork**: This is an enhanced version of [madox2/vim-ai](https://github.com/madox2/vim-ai) with additional **context-aware roles** that automatically understand your project structure and provide enhanced AI assistance.
+
 ![vim-ai demo](./demo.gif)
 
 To get an idea what is possible to do with AI commands see the [prompts](https://github.com/madox2/vim-ai/wiki/AI-prompts#prompts) on the [Community Wiki](https://github.com/madox2/vim-ai/wiki)
@@ -17,6 +19,7 @@ To get an idea what is possible to do with AI commands see the [prompts](https:/
 - Generate images
 - Integrates with any OpenAI-compatible API
 - AI provider plugins
+- **🆕 Context-Aware Roles**: Built-in roles that automatically include project context
 
 ## How it works
 
@@ -75,7 +78,7 @@ let g:vim_ai_token_file_path = '~/.config/openai.token'
 ### Using `vim-plug`
 
 ```vim
-Plug 'madox2/vim-ai'
+Plug 'guilt/vim-ai'
 ```
 
 ### Manual installation
@@ -85,11 +88,11 @@ Using built-in Vim packages `:help packages`
 ```sh
 # vim
 mkdir -p ~/.vim/pack/plugins/start
-git clone https://github.com/madox2/vim-ai.git ~/.vim/pack/plugins/start/vim-ai
+git clone https://github.com/guilt/vim-ai.git ~/.vim/pack/plugins/start/vim-ai
 
 # neovim
 mkdir -p ~/.local/share/nvim/site/pack/plugins/start
-git clone https://github.com/madox2/vim-ai.git ~/.local/share/nvim/site/pack/plugins/start/vim-ai
+git clone https://github.com/guilt/vim-ai.git ~/.local/share/nvim/site/pack/plugins/start/vim-ai
 ```
 
 ## Usage
@@ -124,6 +127,8 @@ To use an AI command, type the command followed by an instruction prompt. You ca
 **Tip:** Use pre-defined roles `/right`, `/below`, `/tab` to choose how chat is open, e.g. `:AIC /right`
 
 **Tip:** Use special role `/populate` or `/populate-all` to show options in the chat header config, e.g. `:AIC /populate /gemini`
+
+**Tip:** Use context-aware roles like `/codebase`, `/refactor`, `/debug`, `/review` for enhanced project understanding
 
 **Tip:** Combine commands with a range `:help range`, e.g. to select the whole buffer - `:%AIE fix grammar`
 
@@ -174,6 +179,31 @@ Now you can select text and run it with command `:AIEdit /grammar`.
 You can also combine roles `:AI /o1-mini /grammar helo world!`
 
 See [roles-example.ini](./roles-example.ini) for more examples.
+
+### Context-Aware Roles
+
+vim-ai includes built-in roles that automatically understand your project context:
+
+- `/codebase` - Code assistant with full project awareness
+- `/refactor` - Refactoring expert that considers code structure  
+- `/debug` - Debugging specialist with context analysis
+- `/review` - Code reviewer with project understanding
+- `/architect` - Software architect for system design
+- `/test` - Testing expert for comprehensive test generation
+- `/docs` - Documentation specialist
+- `/git` - Git workflow expert with repository awareness
+- `/project` - Project analyst for codebase insights
+
+These roles automatically include relevant project information like file structure, current file context, and git status when appropriate.
+
+Example:
+```vim
+:AIChat /codebase
+" Automatically includes project structure and current file context
+
+:AIEdit /refactor optimize this function
+" Includes related files and project patterns for better refactoring
+```
 
 ## Reference
 
@@ -730,34 +760,29 @@ You might find useful a [collection](https://github.com/madox2/vim-ai/wiki/Custo
 To create a custom command, you can call `AIRun`, `AIEditRun` and `AIChatRun` functions. For example:
 
 ```vim
-" custom command suggesting git commit message, takes no arguments
+" Enhanced custom commands using context-aware roles
+
+" Git commit message with automatic git context
 function! GitCommitMessageFn()
   let l:range = 0
   let l:diff = system('git --no-pager diff --staged')
   let l:prompt = "generate a short commit message from the diff below:\n" . l:diff
-  let l:config = {
-  \  "options": {
-  \    "model": "gpt-4o",
-  \    "initial_prompt": ">>> system\nyou are a code assistant",
-  \    "temperature": 1,
-  \  },
-  \}
-  call vim_ai#AIRun(l:range, l:config, l:prompt)
+  call vim_ai#AIRun(l:range, {}, "/git " . l:prompt)
 endfunction
 command! GitCommitMessage call GitCommitMessageFn()
 
-
-" custom command that provides a code review for selected code block
+" Code review with automatic project context
 function! CodeReviewFn(range) range
-  let l:prompt = "programming syntax is " . &filetype . ", review the code below"
-  let l:config = {
-  \  "options": {
-  \    "initial_prompt": ">>> system\nyou are a clean code expert",
-  \  },
-  \}
-  exe a:firstline.",".a:lastline . "call vim_ai#AIChatRun(a:range, l:config, l:prompt)"
+  let l:prompt = "review the code below"
+  exe a:firstline.",".a:lastline . "call vim_ai#AIChatRun(a:range, {}, '/review ' . l:prompt)"
 endfunction
 command! -range -nargs=? AICodeReview <line1>,<line2>call CodeReviewFn(<range>)
+
+" Simplified versions using context-aware roles directly
+command! GitCommit AI /git generate a commit message for the staged changes
+command! -range CodeReview <line1>,<line2>AIChat /review
+command! -range Refactor <line1>,<line2>AIEdit /refactor
+command! -range Debug <line1>,<line2>AIChat /debug help me fix this issue
 ```
 
 ## Testing
@@ -793,7 +818,9 @@ The `run-tests.sh` script automatically:
 
 ## Contributing
 
-Contributions are welcome! Please feel free to open a pull request, report an issue, or contribute to the [Community Wiki](https://github.com/madox2/vim-ai/wiki).
+Contributions are welcome! Please feel free to open a pull request or report an issue.
+
+**Note**: Community wiki content is still available at the [original repository's wiki](https://github.com/madox2/vim-ai/wiki). We're working on migrating and enhancing the wiki content for this fork.
 
 ## Important Disclaimer
 
@@ -803,4 +830,4 @@ Contributions are welcome! Please feel free to open a pull request, report an is
 
 ## License
 
-[MIT License](https://github.com/madox2/vim-ai/blob/main/LICENSE)
+[MIT License](https://github.com/guilt/vim-ai/blob/main/LICENSE)
